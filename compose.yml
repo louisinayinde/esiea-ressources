@@ -1,0 +1,78 @@
+version: '3.8'
+
+
+services:
+  worker: 
+    image: localhost:5000/esiea-ressources_worker:latest
+    depends_on:
+      redis: 
+        condition: service_healthy
+      db: 
+        condition: service_healthy
+    networks: 
+      - cats-or-dogs-network
+  vote: 
+    image: localhost:5000/esiea-ressources_vote:latest
+    volumes:
+      - ./vote:/usr/local/app
+    ports: 
+      - "127.0.0.1:5002:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: 
+      - cats-or-dogs-network
+
+  seed-data: 
+    image: localhost:5000/esiea-ressources_seed-data:latest
+    depends_on: 
+      vote: 
+        condition: service_healthy
+    restart: "no"
+    networks: 
+      - cats-or-dogs-network
+
+  result: 
+    image: localhost:5000/esiea-ressources_result:latest
+    volumes: 
+      - ./result:/usr/local/app
+    ports: 
+      - "127.0.0.1:5001:80"
+      - "127.0.0.1:9229:9229"
+    depends_on: 
+      db: 
+        condition: service_healthy
+    networks: 
+      - cats-or-dogs-network
+
+  db: 
+    image: postgres:15-alpine
+    environment: 
+      POSTGRES_PASSWORD: esiea
+    volumes: 
+      - "db-data:/var/lib/postgresql/data"
+      - "./healthchecks:/healthchecks"
+    healthcheck: 
+      test: /healthchecks/postgres.sh
+      interval: "5s"
+    networks: 
+      - cats-or-dogs-network
+
+  redis: 
+    image: redis:latest
+    volumes: 
+      - "./healthchecks:/healthchecks"
+    healthcheck: 
+      test: /healthchecks/redis.sh
+      interval: "5s"
+    networks: 
+      - cats-or-dogs-network
+
+volumes: 
+  db-data: 
+
+networks: 
+  cats-or-dogs-network: 
